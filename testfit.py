@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import cosmolopy.perturbation as pb
 import cosmolopy.density as cd
 from scipy.integrate import quad
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
 cosmo = {'baryonic_effects':True,'omega_k_0':0,'omega_M_0':0.315, 'omega_b_0':0.0487, 'n':0.96, 'N_nu':0, 'omega_lambda_0':0.685,'omega_n_0':0., 'sigma_8':0.829,'h':0.673}
 
 
