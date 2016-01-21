@@ -3,6 +3,8 @@ import cosmolopy.perturbation as pb
 import cosmolopy.density as cd
 from scipy.integrate import quad
 import itertools
+from scipy.interpolate import interp1d
+from scipy.interpolate import RectBivariateSpline as RBS
 
 Om,sig8,ns,h,Ob = 0.315, 0.829, 0.96, 0.673, 0.0487
 cosmo = {'baryonic_effects':True,'omega_k_0':0,'omega_M_0':0.315, 'omega_b_0':0.0487, 'n':0.96, 'N_nu':0, 'omega_lambda_0':0.685,'omega_n_0':0., 'sigma_8':0.829,'h':0.673}
@@ -47,7 +49,9 @@ def sigG(RL,j):
 	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
 dsig1m = n.load('sig1m.npz')
 sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
-sig1m = interp1d(sig1mRl,sig1marr,kind='cubic')
+fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
+def sig1m(RL):
+	return fs1m(RL)
 #def sig1m(RL,kmax=20.):
 	#coeff = n.array([-35197.22457096,  44816.6140037 , -22450.21477783,   5671.79478317,
      #    -790.99091133,     74.00855598])
@@ -74,14 +78,28 @@ sig1m = interp1d(sig1mRl,sig1marr,kind='cubic')
 #def sig1mX(RL,R0,kf=20.):
 #    kmax = kf/R0
 #    return quad(lambda k: Del2k(k)*(k**2)*WG(RG(RL)*k)*W(R0*k)/k, 0, kmax)[0]
-def SX(RL,R0,kf=10.): 
-    logmax = n.log(kf/R0)
-    return quad(lambda logk: Del2k(n.exp(logk))*W(RL*n.exp(logk))*W(R0*n.exp(logk)), 0, logmax)[0]
-def sig1mX(RL,R0,kf=10.):
-    logmax = n.log(kf/R0)
-    return quad(lambda logk: Del2k(n.exp(logk))*(n.exp(logk)**2)*WG(RG(RL)*n.exp(logk))*W(R0*n.exp(logk)), 0, logmax)[0]
-def gam(RL,kf=20.):
-	return sig1m(RL,kf)/n.sqrt(sig0(RL)*sigG(RL,2))
+dSX = n.load('logSX.npz')
+lSXRl,lSXR0,arrSX = dSX['arr_0'],dSX['arr_1'],dSX['arr_2']
+fSX = RBS(lSXRl,lSXR0,arrSX)
+def SX(RL,R0):
+	res = fSX(n.log(RL),n.log(R0))
+	if res.size > 1: print 'Warning: SX called with array instead of single number'
+	return res[0][0]
+ds1mX = n.load('logsig1mX.npz')
+ls1mXRl,ls1mXR0,arrs1mX = ds1mX['arr_0'],ds1mX['arr_1'],ds1mX['arr_2']
+fs1mX = RBS(ls1mXRl,ls1mXR0,arrs1mX)
+def sig1mX(RL,R0):
+	res = fs1mX(n.log(RL),n.log(R0))
+	if res.size > 1: print 'Warning: s1mX called with array instead of single number'
+	return res[0][0]
+#def SX(RL,R0,kf=10.): 
+#    logmax = n.log(kf/R0)
+#    return quad(lambda logk: Del2k(n.exp(logk))*W(RL*n.exp(logk))*W(R0*n.exp(logk)), 0, logmax)[0]
+#def sig1mX(RL,R0,kf=10.):
+#    logmax = n.log(kf/R0)
+#    return quad(lambda logk: Del2k(n.exp(logk))*(n.exp(logk)**2)*WG(RG(RL)*n.exp(logk))*W(R0*n.exp(logk)), 0, logmax)[0]
+def gam(RL):
+	return sig1m(RL)/n.sqrt(sig0(RL)*sigG(RL,2))
 def Vstar(RL):
 	return (6*n.pi)**1.5*(sigG(RL,1)/sigG(RL,2))**3
 def erf(x):
