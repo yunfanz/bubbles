@@ -1,7 +1,7 @@
 import numpy as n, matplotlib.pyplot as p, scipy.special
 import cosmolopy.perturbation as pb
 import cosmolopy.density as cd
-from scipy.integrate import quad
+from scipy.integrate import quad, tplquad
 import itertools
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
@@ -21,6 +21,8 @@ def R2m(RL):
 	m = 4*n.pi/3*rhobar*RL**3
 	return m
 
+def mmin(z,Tvir=1.E4):
+	return pb.virial_mass(Tvir,z,**cosmo)
 def RG(RL): return 0.46*RL
 def W(y): return 3/y**3*(n.sin(y)-y*n.cos(y))
 def WG(y): return n.exp(-y**2/2)
@@ -147,12 +149,27 @@ def subgrand(b,del0,m,M0,z):
 def integrand(del0,m,M0,z):  #2s*f_ESP
 	s = sig0(m2R(m))
 	print '#################'
-	return quad(lambda b: prob(b)*subgrand(b,del0,m,M0,z),0,100)[0]/2/s
+	return quad(lambda b: prob(b)*subgrand(b,del0,m,M0,z),0,4.)[0]/2/s
 def dsdm(m):
 	return (sig0(m2R(m+1))-sig0(m2R(m-1)))/2
+def fcoll(del0,M0,z):
+	return quad(lambda m: integrand(del0,m,M0,z)*dsdm(m),mmin(z),M0)
 
-
-
+def All(x,b,m,del0,M0,z): #z,y,x,c,c,c
+	V,r,dmdr = pb.volume_radius_dmdr(m,**cosmo)
+	R0 = m2R(M0)
+	s,s0,sx = sig0(r), sig0(R0),SX(r,R0)
+	Bb = B(z,b,s)
+	gamm = gam(r)
+	epx,q = epX(m,M0), Q(m,M0)
+	#print 'gamm,epx,q =',gamm,epx,q 
+	meanmu = del0/n.sqrt(s)*sx/s0
+	varmu = Q(m,M0)
+	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
+	varx = 1-gamm**2-gamm**2*(1-epx)**2*(1-q)/q 
+	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
+	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
+	return fact*prob(b)*(x/gamm-b)*F(x)*pG(x,meanx,varx)/2/sig0(m2R(m))*dsdm(m)
 
 p.figure()
 Z = [12.]
@@ -199,8 +216,9 @@ for z in Z:
 	p.plot(S0,BFZHlin,'b.-')
 
 
-	M0 = zeta*mmin/2
+	M0 = zeta*mmin*2
 	del0 = 5.
-	print quad(lambda m: integrand(del0,m,M0,12.)*dsdm(m),mmin,M0)
+	#print quad(lambda m: integrand(del0,m,M0,12.)*dsdm(m),mmin,M0)
+	tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
 p.show()
 

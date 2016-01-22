@@ -32,8 +32,8 @@ def main():
 def mainSX():
     # Generate Data...
     numdata = 100
-    logR0min,logR0max = n.log(0.2),n.log(30.)
-    logrlmin = n.log(0.06)
+    logR0min,logR0max = n.log(0.2),n.log(40.)
+    logrlmin = n.log(0.04)
     logR0 = logR0min+n.random.random(numdata)*(logR0max-logR0min)
     r,R0 = [],[]
     for lR0 in logR0: 
