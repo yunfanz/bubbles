@@ -7,12 +7,12 @@ from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
 import optparse, sys
 
-o = optparse.OptionParser()
-o.add_option('-d','--del0', dest='del0', default=5.)
-o.add_option('-m','--mul', dest='mul', default=1.)
-o.add_option('-z','--red', dest='red', default=12.)
-opts,args = o.parse_args(sys.argv[1:])
-print opts, args
+# o = optparse.OptionParser()
+# o.add_option('-d','--del0', dest='del0', default=5.)
+# o.add_option('-m','--mul', dest='mul', default=1.)
+# o.add_option('-z','--red', dest='red', default=12.)
+# opts,args = o.parse_args(sys.argv[1:])
+# print opts, args
 
 Om,sig8,ns,h,Ob = 0.315, 0.829, 0.96, 0.673, 0.0487
 cosmo = {'baryonic_effects':True,'omega_k_0':0,'omega_M_0':0.315, 'omega_b_0':0.0487, 'n':0.96, 'N_nu':0, 'omega_lambda_0':0.685,'omega_n_0':0., 'sigma_8':0.829,'h':0.673}
@@ -64,7 +64,7 @@ def sig1m(RL):
 	return fs1m(RL)
 
 dSX = n.load('logSX.npz')
-lSXRl,lSXR0,arrSX = dSX['arr_0'],dSX['arr_1'],dSX['arr_2']
+lSXRl,lSXR0,arrSX = dSX['arr_0'],dSX['arr_1'],dSX['arr_2']    #(Rl,R0) in ((0.04,40),(0.2,40))
 fSX = RBS(lSXRl,lSXR0,arrSX)
 def SX(RL,R0):
 	res = fSX(n.log(RL),n.log(R0))
@@ -77,6 +77,16 @@ def sig1mX(RL,R0):
 	res = fs1mX(n.log(RL),n.log(R0))
 	if res.size > 1: print 'Warning: s1mX called with array instead of single number'
 	return res[0][0]
+
+def sig1m_quad(RL,kf=10.):
+	kmax = kf/RL
+	return quad(lambda k: Del2k(k)*W(RL*k)*WG(RG(RL)*k)/k, 0.0001, kmax)[0]
+def SX_quad(RL,R0,kf=10.): 
+   kmax = kf/R0
+   return quad(lambda k: Del2k(k)*W(RL*k)*W(R0*k)/k, 0.0001, kmax)[0]
+def sig1mX_quad(RL,R0,kf=10.):
+   kmax = kf/R0
+   return quad(lambda k: Del2k(k)*(k**2)*WG(RG(RL)*k)*W(R0*k)/k, 0.0001, kmax)[0]
 
 def gam(RL):
 	return sig1m(RL)/n.sqrt(sig0(RL)*sigG(RL,2))
@@ -127,7 +137,13 @@ def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=Fa
 	#factint = quad(lambda x: (x/gamm-b)*F(x)*pG(x,meanx,varx),b*gamm,100)[0]
 	#print fact, factint
 	return fact*factint
-
+def subgrand_quad(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
+	Bb = B(z,b,s)
+	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
+	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
+	factint = quad(lambda x: (x/gamm-b)*F(x)*pG(x,meanx,varx),b*gamm,100)[0]
+	#print fact, factint
+	return fact*factint
 def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
 	Bb = B(z,b,s)
 	#print 'gamm,epx,q =',gamm,epx,q 
@@ -152,7 +168,7 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 	meanmu = del0/n.sqrt(s)*sx/s0
 	varmu = Q(m,M0)
 	varx = 1-gamm**2-gamm**2*(1-epx)**2*(1-q)/q 
-	b = n.arange(0.000001,3.,0.03)
+	b = n.arange(0.00001,3.,0.03)
 	y = []
 	for bx in b:
 		y.append(prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s)
@@ -160,7 +176,7 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 		#print bx,y[-1]
 		if n.isnan(y[-1]): 
 			print 'NAN detected, breaking at: '
-			print bx,prob(bx),del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V
+			print 'm:%f, bx:%f,del0:%f ,s:%f ,s0:%f ,sx:%f ,epx:%f ,q:%f ,meanmu:%f ,varmu:%f ,varx:%f ,gamm:%f ,R0:%f ,V:%f' % (m,bx,prob(bx),del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V) 
 			break
 	return n.trapz(y,b,dx=0.05)
 	#return quad(lambda b: prob(b)*subgrand_trapz(b,del0,m,M0,z),0,4.)[0]/2/s
@@ -193,20 +209,4 @@ def fcoll_trapz_log(del0,M0,z):
 def m2S(m):
 	return sig0(m2R(m))
 
-zeta = 40.
-
-# Z = float(opts.red)
-# M0 = zeta*mmin(Z)*float(opts.mul)
-# del0 = float(opts.del0)
-Z = 12.
-M0 = zeta*mmin(Z)
-dlist = n.linspace(8,10,10)
-for del0 in dlist:
-	res = fcoll_trapz_log(del0,M0,Z)
-	print m2S(M0), res[0]
-if False:
-	p.figure()
-	p.plot(res[1],res[2])
-	p.show()
-	#tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
 

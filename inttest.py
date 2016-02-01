@@ -5,6 +5,14 @@ from scipy.integrate import quad, tplquad
 import itertools
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
+import optparse, sys
+
+# o = optparse.OptionParser()
+# o.add_option('-d','--del0', dest='del0', default=5.)
+# o.add_option('-m','--mul', dest='mul', default=1.)
+# o.add_option('-z','--red', dest='red', default=12.)
+# opts,args = o.parse_args(sys.argv[1:])
+# print opts, args
 
 Om,sig8,ns,h,Ob = 0.315, 0.829, 0.96, 0.673, 0.0487
 cosmo = {'baryonic_effects':True,'omega_k_0':0,'omega_M_0':0.315, 'omega_b_0':0.0487, 'n':0.96, 'N_nu':0, 'omega_lambda_0':0.685,'omega_n_0':0., 'sigma_8':0.829,'h':0.673}
@@ -16,6 +24,7 @@ def m2R(m):
 def m2V(m):
 	rhobar = cd.cosmo_densities(**cosmo)[1]  #msun/Mpc
 	return m/rhobar
+
 def R2m(RL):
 	rhobar = cd.cosmo_densities(**cosmo)[1]  #msun/Mpc
 	m = 4*n.pi/3*rhobar*RL**3
@@ -50,7 +59,8 @@ def sigG(RL,j):
 	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
 dsig1m = n.load('sig1m.npz')
 sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
-fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
+fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')    #interpolated from 0.04 to 100000
+
 def sig1m(RL):
 	return fs1m(RL)
 
@@ -101,7 +111,7 @@ def epX(m,M0):
 
 def trapz(x,y):
 	return (x[-1]*y[-1]-x[0]*y[0]+n.sum(x[1:]*y[:-1]-y[1:]*x[:-1]))/2
-def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
+def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
 	Bb = B(z,b,s)
 	#print 'gamm,epx,q =',gamm,epx,q 
 	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
@@ -112,6 +122,21 @@ def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False)
 	lx = n.linspace(lxmin,lxmax,100)
 	x = n.exp(lx)
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)*x
+	factint = trapz(x,y)
+	#print y
+	#print factint
+	#factint = quad(lambda x: (x/gamm-b)*F(x)*pG(x,meanx,varx),b*gamm,100)[0]
+	#print fact, factint
+	return fact*factint
+def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
+	Bb = B(z,b,s)
+	#print 'gamm,epx,q =',gamm,epx,q 
+	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
+	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
+	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
+	#print b
+	x = n.linspace(b*gamm,100.,100)
+	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)
 	factint = trapz(x,y)
 	#print y
 	#print factint
@@ -163,39 +188,8 @@ def fcoll_trapz_log(del0,M0,z):
 	for lm in lmx:
 		m = n.exp(lm)
 		y.append(integrand_trapz(del0,m,M0,R0,z)*dsdm(m)*m)
-		print m, y[-1]
+		#print m, y[-1]
 	return trapz(lmx,y),n.exp(lmx),y
-
-Z = [12.]
-###################### PARAMETERS ############################
-#z = 12.
-for z in Z:
-	deltac = Deltac(z)
-	#deltac = 1.686*(1+z)    #z_eq =3233?
-	##print deltac
-	#Del2k0 = Del2k/fgrowth**2     #linearly extrapolated to present epoch
-	####################################
-	#sig_8 = n.sqrt(sig0(8./cosmo['h'],Del2k0))
-	#print sig_8
-	sig_8 = n.sqrt(sig0(8./cosmo['h']))
-	print 'sig_8',sig_8
-	#Del2k0 = Del2k0*(sig8/sig_8)
-	####################################
-	zeta = 40.
-	K = scipy.special.erfinv(1-1./zeta)
-	print 'K(zeta)=',K
-	#import IPython; IPython.embed()
-	####################### FZH04 ##############################
-	##### m_min
-	Tvir = 1.E4
-
-
-	M0 = zeta*mmin(12.)*2
-	del0 = 5.
-	res = fcoll_trapz_log(del0,M0,12.)
-	print res[0]
-	p.figure()
-	p.plot(res[1],res[2])
-	p.show()
-	#tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
+def m2S(m):
+	return sig0(m2R(m))
 

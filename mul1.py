@@ -57,7 +57,7 @@ def sig0(RL):
 	return (pb.sigma_r(RL,0.,**cosmo)[0])**2
 def sigG(RL,j): 
 	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
-dsig1m = n.load('sig1m_long.npz')
+dsig1m = n.load('sig1m.npz')
 sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
 fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
 def sig1m(RL):
@@ -127,7 +127,6 @@ def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=Fa
 	#factint = quad(lambda x: (x/gamm-b)*F(x)*pG(x,meanx,varx),b*gamm,100)[0]
 	#print fact, factint
 	return fact*factint
-
 def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
 	Bb = B(z,b,s)
 	#print 'gamm,epx,q =',gamm,epx,q 
