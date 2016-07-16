@@ -5,7 +5,6 @@ import cosmolopy.perturbation as pb
 import cosmolopy.density as cd
 from scipy.integrate import quad
 from scipy.interpolate import interp1d, interp2d
-from scipy.interpolate import RectBivariateSpline as RBS
 cosmo = {'baryonic_effects':True,'omega_k_0':0,'omega_M_0':0.315, 'omega_b_0':0.0487, 'n':0.96, 'N_nu':0, 'omega_lambda_0':0.685,'omega_n_0':0., 'sigma_8':0.829,'h':0.673}
 
 
@@ -18,9 +17,7 @@ def Del2k(k):
     #fgrowth = pb.fgrowth(z, cosmo['omega_M_0']) 
     #Del2k0 = Del2k/fgrowth**2#*pb.norm_power(**cosmo)
     return Del2k
-def sigint(r):
-    kmax = 10./r
-    return quad(lambda k: Del2k(k)*W(r*k)*WG(RG(r)*k)/k, 0.0001, kmax)[0]
+
 def SXlog(RL,R0,kf=10.): 
     logmax = n.log(kf/R0)
     return quad(lambda logk: Del2k(n.exp(logk))*W(RL*n.exp(logk))*W(R0*n.exp(logk)), -1000., logmax)[0]
@@ -59,14 +56,14 @@ arr = n.ones_like(xx)
 for i,lrl in enumerate(lRl):
     for j,lr0 in enumerate(lR0):
         rl,r0 = n.exp(lrl),n.exp(lr0)
-        arr[i,j] = SX(rl,r0)
+        arr[i,j] = sig1mX(rl,r0)
         print rl,r0,arr[i,j]
 
 # plt.figure()
 # plt.imshow(arr)
 # plt.colorbar()
 # plt.show()
-n.savez('logSX',xx,yy,arr)
-fSX = interp2d(xx,yy,arr,kind='cubic')
-print SX(0.1,0.2), fSX(n.log(0.1),n.log(0.2))
-print SX(0.7,10.), fSX(n.log(0.7),n.log(10.))
+n.savez('logsig1mX',xx,yy,arr)
+fsig1mX = interp2d(xx,yy,arr,kind='cubic')
+print sig1mX(0.1,0.2), fsig1mX(n.log(0.1),n.log(0.2))
+print sig1mX(0.7,10.), fsig1mX(n.log(0.7),n.log(10.))

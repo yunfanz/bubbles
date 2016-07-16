@@ -6,6 +6,9 @@ import itertools
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
 import optparse, sys
+from joblib import Parallel, delayed
+import multiprocessing
+num_cores = multiprocessing.cpu_count()
 
 o = optparse.OptionParser()
 o.add_option('-d','--del0', dest='del0', default=5.)
@@ -108,16 +111,20 @@ def epX(m,M0):
 	sg1mX = sig1mX(r,R0)
 	return s*sg1m/sx/sg1mX
 
+#def trapz(x,y):
+#	return (x[-1]*y[-1]-x[0]*y[0]+n.sum(x[1:]*y[:-1]-y[1:]*x[:-1]))/2
 def trapz(x,y):
-	return (x[-1]*y[-1]-x[0]*y[0]+n.sum(x[1:]*y[:-1]-y[1:]*x[:-1]))/2
+	return n.trapz(y,x=x)
+
 def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
+	# EqA8, log intervaled integration axis
 	Bb = B(z,b,s)
 	#print 'gamm,epx,q =',gamm,epx,q 
 	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
 	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b
-	lxmin,lxmax = n.log(b*gamm), n.log(80.) 
+	lxmin,lxmax = n.log(b*gamm), n.log(80.)
 	lx = n.linspace(lxmin,lxmax,100)
 	x = n.exp(lx)
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)*x
@@ -128,13 +135,14 @@ def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=Fa
 	#print fact, factint
 	return fact*factint
 def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
+	# EqA8, non-log intervaled integration axis
 	Bb = B(z,b,s)
 	#print 'gamm,epx,q =',gamm,epx,q 
 	meanx = gamm*((Bb-del0*sx/s0)*(1-epx)/q/n.sqrt(s)+Bb*epx/n.sqrt(s))
 	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b
-	x = n.linspace(b*gamm,100.,100)
+	x = n.linspace(b*gamm,100.,1000)
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)
 	factint = trapz(x,y)
 	#print y
@@ -143,6 +151,7 @@ def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False)
 	#print fact, factint
 	return fact*factint
 def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
+    # of A7
 	s = sig0(m2R(m))
 	V,r,dmdr = pb.volume_radius_dmdr(m,**cosmo)
 	s,s0,sx = sig0(r), sig0(R0),SX(r,R0)
@@ -151,7 +160,7 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 	meanmu = del0/n.sqrt(s)*sx/s0
 	varmu = Q(m,M0)
 	varx = 1-gamm**2-gamm**2*(1-epx)**2*(1-q)/q 
-	b = n.arange(0.000001,3.,0.03)
+	b = n.arange(0.000001,3.,0.003)
 	y = []
 	for bx in b:
 		y.append(prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s)
@@ -179,16 +188,20 @@ def dsdm(m):
 # 		print m, y[-1]
 # 	return n.trapz(y,mx,dx=mm)
 # 	#eturn trapz(mx,y)
-def fcoll_trapz_log(del0,M0,z):
+def fcoll_trapz_log(del0,M0,z,debug=False):
+	print del0
 	mm = mmin(z)
 	R0 = m2R(M0)
-	lmx = n.linspace(n.log(mm),n.log(M0),100)
+	lmx = n.linspace(n.log(mm),n.log(M0),1000)
 	y = []
 	for lm in lmx:
 		m = n.exp(lm)
 		y.append(integrand_trapz(del0,m,M0,R0,z)*dsdm(m)*m)
 		#print m, y[-1]
-	return trapz(lmx,y),n.exp(lmx),y
+	if debug: 
+		return trapz(lmx,y),n.exp(lmx),y
+	else:
+		return trapz(lmx,y)
 def m2S(m):
 	return sig0(m2R(m))
 
@@ -199,13 +212,15 @@ zeta = 40.
 # del0 = float(opts.del0)
 Z = 12.
 M0 = zeta*mmin(Z)
-dlist = n.linspace(8,10,10)
-for del0 in dlist:
-	res = fcoll_trapz_log(del0,M0,Z)
-	print m2S(M0), res[0]
-if False:
+dlist = n.linspace(8,10,16)
+# for del0 in dlist:
+# 	res = fcoll_trapz_log(del0,M0,Z)
+# 	print m2S(M0), res[0]
+reslist = Parallel(n_jobs=num_cores)(delayed(fcoll_trapz_log)(del0,M0,Z) for del0 in dlist)
+print reslist
+if True:
 	p.figure()
-	p.plot(res[1],res[2])
+	p.plot(dlist,reslist)
 	p.show()
 	#tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
 

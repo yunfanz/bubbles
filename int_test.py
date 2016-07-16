@@ -57,7 +57,8 @@ def sig0(RL):
 	return (pb.sigma_r(RL,0.,**cosmo)[0])**2
 def sigG(RL,j): 
 	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
-dsig1m = n.load('sig1m_long.npz')
+#dsig1m = n.load('sig1m_long.npz')
+dsig1m = n.load('sig1m.npz')
 sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
 fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
 def sig1m(RL):
