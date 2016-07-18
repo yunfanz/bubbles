@@ -1,3 +1,4 @@
+#Module of an older version of mul1 functions
 import numpy as n, matplotlib.pyplot as p, scipy.special
 import cosmolopy.perturbation as pb
 import cosmolopy.density as cd

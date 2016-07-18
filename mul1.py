@@ -6,6 +6,7 @@ import itertools
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
 import optparse, sys
+from scipy.optimize import newton
 from joblib import Parallel, delayed
 import multiprocessing
 num_cores = multiprocessing.cpu_count()
@@ -32,6 +33,13 @@ def R2m(RL):
 	rhobar = cd.cosmo_densities(**cosmo)[1]  #msun/Mpc
 	m = 4*n.pi/3*rhobar*RL**3
 	return m
+
+dmS = n.load('m2S.npz')
+MLtemp,SLtemp = dmS['arr_0'],dmS['arr_1']
+fs2m = interp1d(SLtemp,MLtemp,kind='cubic')
+def S2M(S):
+	return fs2m(S)
+
 def mmin(z,Tvir=1.E4):
 	return pb.virial_mass(Tvir,z,**cosmo)
 def RG(RL): return 0.46*RL
@@ -54,32 +62,66 @@ def polyval2d(x, y, m):
     for a, (i,j) in zip(m, ij):
         z += a * x**i * y**j
     return z
-def sig0test(RL,kmax):
-	return quad(lambda k: Del2k(k)*W(RL*k)**2/k, 0, kmax)[0]   #z=0 extrapolated to present
-def sig0(RL):
-	return (pb.sigma_r(RL,0.,**cosmo)[0])**2
-def sigG(RL,j): 
-	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
-dsig1m = n.load('sig1m.npz')
-sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
-fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
-def sig1m(RL):
-	return fs1m(RL)
-
-dSX = n.load('logSX.npz')
-lSXRl,lSXR0,arrSX = dSX['arr_0'],dSX['arr_1'],dSX['arr_2']
-fSX = RBS(lSXRl,lSXR0,arrSX)
-def SX(RL,R0):
-	res = fSX(n.log(RL),n.log(R0))
-	if res.size > 1: print 'Warning: SX called with array instead of single number'
-	return res[0][0]
-ds1mX = n.load('logsig1mX.npz')
-ls1mXRl,ls1mXR0,arrs1mX = ds1mX['arr_0'],ds1mX['arr_1'],ds1mX['arr_2']
-fs1mX = RBS(ls1mXRl,ls1mXR0,arrs1mX)
-def sig1mX(RL,R0):
-	res = fs1mX(n.log(RL),n.log(R0))
-	if res.size > 1: print 'Warning: s1mX called with array instead of single number'
-	return res[0][0]
+#def sig0test(RL,kmax):
+#	return quad(lambda k: Del2k(k)*W(RL*k)**2/k, 0, kmax)[0]   #z=0 extrapolated to present
+#def sig0(RL):
+#	return (pb.sigma_r(RL,0.,**cosmo)[0])**2
+#def sigG(RL,j): 
+#	return (pb.sigma_j(RL,j,0.,**cosmo)[0])**2
+# dsig1m = n.load('sig1m.npz')
+# sig1mRl,sig1marr = dsig1m['arr_0'],dsig1m['arr_1']
+# fs1m = interp1d(sig1mRl,sig1marr,kind='cubic')
+# def sig1m(RL):
+# 	return fs1m(RL)
+# dSX = n.load('logSX.npz')
+# lSXRl,lSXR0,arrSX = dSX['arr_0'],dSX['arr_1'],dSX['arr_2']
+# fSX = RBS(lSXRl,lSXR0,arrSX)
+# def SX(RL,R0):
+# 	res = fSX(n.log(RL),n.log(R0))
+# 	if res.size > 1: print 'Warning: SX called with array instead of single number'
+# 	return res[0][0]
+# ds1mX = n.load('logsig1mX.npz')
+# ls1mXRl,ls1mXR0,arrs1mX = ds1mX['arr_0'],ds1mX['arr_1'],ds1mX['arr_2']
+# fs1mX = RBS(ls1mXRl,ls1mXR0,arrs1mX)
+# def sig1mX(RL,R0):
+# 	res = fs1mX(n.log(RL),n.log(R0))
+# 	if res.size > 1: print 'Warning: s1mX called with array instead of single number'
+# 	return res[0][0]
+def ig_sig0(RL,k):
+    return Del2k(k)*WG(RL*k)**2/k
+def ig_sigG(RL,j,k):
+    return Del2k(k)*(k**(2*j))*WG(RG(RL)*k)**2/k
+def ig_sig1m(RL,k):
+    return Del2k(k)*(k**2)*WG(RG(RL)*k)*W(RL*k)/k
+def ig_sig1mX(RL,R0,k):
+    return Del2k(k)*(k**2)*WG(RG(RL)*k)*W(R0*k)/k
+def ig_SX(RL,R0,k):
+    return Del2k(k)*W(RL*k)*W(R0*k)/k
+def sig0(RL,kf=50.,N=2000):
+    kmax = kf/RL
+    K = n.exp(n.linspace(n.log(0.0001),n.log(kmax),N))
+    Y = ig_sig0(RL,K)
+    return n.trapz(Y,K) 
+def sigG(RL,j,kf=150.,N=1000):
+    kmax = kf/RL
+    K = n.linspace(0.001,kmax,N)
+    Y = ig_sigG(RL,j,K)
+    return n.trapz(Y,K) 
+def sig1m(RL,kf=15.,N=1000):
+    kmax = kf/RL
+    K = n.linspace(0.001,kmax,N)
+    Y = ig_sig1m(RL,K)
+    return n.trapz(Y,K)
+def sig1mX(RL,R0,kf=15.,N=1000):
+    kmax = kf/RL
+    K = n.linspace(0.001,kmax,N)
+    Y = ig_sig1mX(RL,R0,K)
+    return n.trapz(Y,K)
+def SX(RL,R0,kf=10.,N=1000): 
+    kmax = kf/RL
+    K = n.exp(n.linspace(n.log(0.001),n.log(kmax),N))
+    Y = ig_SX(RL,R0,K)
+    return n.trapz(Y,K)
 
 def gam(RL):
 	return sig1m(RL)/n.sqrt(sig0(RL)*sigG(RL,2))
@@ -109,7 +151,7 @@ def epX(m,M0):
 	sx = SX(r,R0)
 	sg1m = sig1m(r)
 	sg1mX = sig1mX(r,R0)
-	return s*sg1m/sx/sg1mX
+	return s*sg1mX/sx/sg1m
 
 #def trapz(x,y):
 #	return (x[-1]*y[-1]-x[0]*y[0]+n.sum(x[1:]*y[:-1]-y[1:]*x[:-1]))/2
@@ -151,7 +193,7 @@ def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False)
 	#print fact, factint
 	return fact*factint
 def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
-    # of A7
+    # of A7, divided by 2s; this IS f_ESP
 	s = sig0(m2R(m))
 	V,r,dmdr = pb.volume_radius_dmdr(m,**cosmo)
 	s,s0,sx = sig0(r), sig0(R0),SX(r,R0)
@@ -160,17 +202,25 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 	meanmu = del0/n.sqrt(s)*sx/s0
 	varmu = Q(m,M0)
 	varx = 1-gamm**2-gamm**2*(1-epx)**2*(1-q)/q 
+	if varx<0:
+		print "varx<0, breaking at varx, gamm, epx, q,m,M0="
+		print varx, gamm, epx, q, m, M0
+
+#!! varx can be negative
+
 	b = n.arange(0.000001,3.,0.003)
 	y = []
 	for bx in b:
-		y.append(prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s)
+		newy = prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s
 		#print 'b,y'
 		#print bx,y[-1]
-		if n.isnan(y[-1]): 
+		if n.isnan(newy): 
 			print 'NAN detected, breaking at: '
 			print bx,prob(bx),del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V
 			break
-	return n.trapz(y,b,dx=0.05)
+		else:
+			y.append(newy)
+	return n.trapz(y,b)
 	#return quad(lambda b: prob(b)*subgrand_trapz(b,del0,m,M0,z),0,4.)[0]/2/s
 def dsdm(m):
 	return n.abs(sig0(m2R(m+1))-sig0(m2R(m-1)))/2
@@ -189,6 +239,7 @@ def dsdm(m):
 # 	return n.trapz(y,mx,dx=mm)
 # 	#eturn trapz(mx,y)
 def fcoll_trapz_log(del0,M0,z,debug=False):
+	# Eq. (6)
 	print del0
 	mm = mmin(z)
 	R0 = m2R(M0)
@@ -196,7 +247,7 @@ def fcoll_trapz_log(del0,M0,z,debug=False):
 	y = []
 	for lm in lmx:
 		m = n.exp(lm)
-		y.append(integrand_trapz(del0,m,M0,R0,z)*dsdm(m)*m)
+		y.append(integrand_trapz(del0,m,M0,R0,z)*dsdm(m)*m) #dsdm*m=ds/dln(m)
 		#print m, y[-1]
 	if debug: 
 		return trapz(lmx,y),n.exp(lmx),y
@@ -211,16 +262,26 @@ zeta = 40.
 # M0 = zeta*mmin(Z)*float(opts.mul)
 # del0 = float(opts.del0)
 Z = 12.
-M0 = zeta*mmin(Z)
-dlist = n.linspace(8,10,16)
+#M0 = zeta*mmin(Z)
+#Mlist = n.exp(n.linspace(n.log(M0),n.log(1000*M0),10))
+Slist = n.arange(7.,15.,1.)
+Mlist = S2M(Slist)
+#dlist = n.linspace(8,10,16)
 # for del0 in dlist:
 # 	res = fcoll_trapz_log(del0,M0,Z)
 # 	print m2S(M0), res[0]
-reslist = Parallel(n_jobs=num_cores)(delayed(fcoll_trapz_log)(del0,M0,Z) for del0 in dlist)
-print reslist
-if True:
-	p.figure()
-	p.plot(dlist,reslist)
-	p.show()
+def parafunc(S0,Z):
+	M0 = S2M(S0)
+	def newfunc(del0):
+		return fcoll_trapz_log(del0,M0,Z)*40-1
+	return newton(newfunc,10.)
+
+#print parafunc(Slist[0],Z)
+ reslist = Parallel(n_jobs=num_cores)(delayed(parafunc)(S0,Z) for S0 in Slist)
+ print reslist
+ if True:
+ 	p.figure()
+ 	p.plot(Slist,reslist)
+ 	p.show()
 	#tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
 
