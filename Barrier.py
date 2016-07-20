@@ -6,7 +6,7 @@ import itertools
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
 import optparse, sys
-from scipy.optimize import newton
+from scipy.optimize import brenth, brentq
 from joblib import Parallel, delayed
 import multiprocessing
 num_cores = multiprocessing.cpu_count()
@@ -264,24 +264,26 @@ zeta = 40.
 Z = 12.
 #M0 = zeta*mmin(Z)
 #Mlist = n.exp(n.linspace(n.log(M0),n.log(1000*M0),10))
-# Slist = n.arange(7.,15.,1.)
-# Mlist = S2M(Slist)
-dlist = n.linspace(7,12.8,8)
+Slist = n.arange(7.,15.,1.)
+Mlist = S2M(Slist)
+#dlist = n.linspace(8,10,16)
 # for del0 in dlist:
 # 	res = fcoll_trapz_log(del0,M0,Z)
 # 	print m2S(M0), res[0]
-S0 = 5.
-def newfunc(del0,S0,Z):
+#Bracks = (())
+def parafunc(S0,Z):
 	M0 = S2M(S0)
-	return fcoll_trapz_log(del0,M0,Z)*zeta-1
+	def newfunc(del0):
+		return fcoll_trapz_log(del0,M0,Z)*40-1
+	return brentq(newfunc,11,15,xtol=5.E-2,maxiter=10)
 
 #
 
 if True:
-	reslist = Parallel(n_jobs=num_cores)(delayed(newfunc)(del0,S0,Z) for del0 in dlist)
+	reslist = Parallel(n_jobs=num_cores)(delayed(parafunc)(S0,Z) for S0 in Slist)
 	print reslist
 	p.figure()
-	p.plot(dlist,reslist)
+	p.plot(Slist,reslist)
 	p.show()
 else:
 	print parafunc(Slist[0],Z)

@@ -45,7 +45,7 @@ def sig1m(RL,R0,kf=10.):
 ################################################################################
 #Trapezoidal Integrations
 def ig_sig0(RL,k):
-    return Del2k(k)*WG(RL*k)**2/k
+    return Del2k(k)*W(RL*k)**2/k
 def ig_sigG(RL,j,k):
     return Del2k(k)*(k**(2*j))*WG(RG(RL)*k)**2/k
 def ig_sig1m(RL,R0,k):
