@@ -261,16 +261,16 @@ zeta = 40.
 # Z = float(opts.red)
 # M0 = zeta*mmin(Z)*float(opts.mul)
 # del0 = float(opts.del0)
-Z = 12.
+Z = 16.
 #M0 = zeta*mmin(Z)
 #Mlist = n.exp(n.linspace(n.log(M0),n.log(1000*M0),10))
 # Slist = n.arange(7.,15.,1.)
 # Mlist = S2M(Slist)
-dlist = n.linspace(7,12.8,8)
+dlist = n.linspace(12,25.8,8)
 # for del0 in dlist:
 # 	res = fcoll_trapz_log(del0,M0,Z)
 # 	print m2S(M0), res[0]
-S0 = 5.
+S0 = 10.
 def newfunc(del0,S0,Z):
 	M0 = S2M(S0)
 	return fcoll_trapz_log(del0,M0,Z)*zeta-1

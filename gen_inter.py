@@ -44,6 +44,7 @@ def sig1m(RL,R0,kf=10.):
     return quad(lambda k: Del2k(k)*(k**2)*WG(RG(RL)*k)*W(RL*k)/k, 0.001, kmax)
 ################################################################################
 #Trapezoidal Integrations
+rref = 0.073
 def ig_sig0(RL,k):
     return Del2k(k)*W(RL*k)**2/k
 def ig_sigG(RL,j,k):
@@ -59,29 +60,34 @@ def sig0_trapz(RL,kf=50.,N=2000):
     K = n.exp(n.linspace(n.log(0.0001),n.log(kmax),N))
     Y = ig_sig0(RL,K)
     return n.trapz(Y,K) 
-def sigG_trapz(RL,j,kf=100.,N=1000):
+def sigG_trapz(RL,j,kf=100.,N=2000,kmin=0.01):
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/RL
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sigG(RL,j,K)
     return n.trapz(Y,K) 
-def sig1m_trapz(RL,R0,kf=15.,N=1000):
+def sig1m_trapz(RL,R0,kf=15.,N=5000,kmin=0.01):
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/R0
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sig1m(RL,R0,K)
     return n.trapz(Y,K)
-def sig1mX_trapz(RL,R0,kf=15.,N=1000):
+def sig1mX_trapz(RL,R0,kf=15.,N=2000,kmin=0.01):    #further check
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/R0
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sig1mX(RL,R0,K)
     return n.trapz(Y,K)
-def SX_trapz(RL,R0,kf=6.,N=1000): 
+def SX_trapz(RL,R0,kf=6.,N=2000,kmin=0.01): 
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/R0
+    K = n.linspace(kmin,kmax,N)
     Y = ig_SX(RL,R0,K)
     return n.trapz(Y,K)
-def SXlog_trapz(RL,R0,kf=10.,N=1000): 
+def SXlog_trapz(RL,R0,kf=10.,N=5000,kmin=0.01): 
     kmax = kf/RL
-    K = n.exp(n.linspace(n.log(0.001),n.log(kmax),N))
+    kmin = kmin/R0
+    K = n.exp(n.linspace(n.log(kmin),n.log(kmax),N))
     Y = ig_SX(RL,R0,K)
     return n.trapz(Y,K)
 ##################################################################################

@@ -28,7 +28,6 @@ def m2R(m):
 def m2V(m):
 	rhobar = cd.cosmo_densities(**cosmo)[1]  #msun/Mpc
 	return m/rhobar
-
 def R2m(RL):
 	rhobar = cd.cosmo_densities(**cosmo)[1]  #msun/Mpc
 	m = 4*n.pi/3*rhobar*RL**3
@@ -55,13 +54,13 @@ def Del2k(k):
 #	return n.sum(Del2k**2*W(RL*k)**2)*(logk[1]-logk[0])
 #def sig0(RL,Del2k):
 #	return n.sum(Del2k**2*W(RL*k)**2/k)*(k[1]-k[0])
-def polyval2d(x, y, m):
-    order = int(n.sqrt(len(m))) - 1
-    ij = itertools.product(range(order+1), range(order+1))
-    z = n.zeros_like(x)
-    for a, (i,j) in zip(m, ij):
-        z += a * x**i * y**j
-    return z
+# def polyval2d(x, y, m):
+#     order = int(n.sqrt(len(m))) - 1
+#     ij = itertools.product(range(order+1), range(order+1))
+#     z = n.zeros_like(x)
+#     for a, (i,j) in zip(m, ij):
+#         z += a * x**i * y**j
+#     return z
 #def sig0test(RL,kmax):
 #	return quad(lambda k: Del2k(k)*W(RL*k)**2/k, 0, kmax)[0]   #z=0 extrapolated to present
 #def sig0(RL):
@@ -102,24 +101,28 @@ def sig0(RL,kf=50.,N=2000):
     K = n.exp(n.linspace(n.log(0.0001),n.log(kmax),N))
     Y = ig_sig0(RL,K)
     return n.trapz(Y,K) 
-def sigG(RL,j,kf=150.,N=1000):
+def sigG(RL,j,kf=100.,N=2000,kmin=0.01):
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/RL
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sigG(RL,j,K)
     return n.trapz(Y,K) 
-def sig1m(RL,kf=15.,N=1000):
+def sig1m(RL,kf=15.,N=5000,kmin=0.01):
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/RL
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sig1m(RL,K)
     return n.trapz(Y,K)
-def sig1mX(RL,R0,kf=15.,N=1000):
+def sig1mX(RL,R0,kf=15.,N=2000,kmin=0.01):    #further check
     kmax = kf/RL
-    K = n.linspace(0.001,kmax,N)
+    kmin = kmin/R0
+    K = n.linspace(kmin,kmax,N)
     Y = ig_sig1mX(RL,R0,K)
     return n.trapz(Y,K)
-def SX(RL,R0,kf=10.,N=1000): 
+def SX(RL,R0,kf=10.,N=5000,kmin=0.01): 
     kmax = kf/RL
-    K = n.exp(n.linspace(n.log(0.001),n.log(kmax),N))
+    kmin = kmin/R0
+    K = n.exp(n.linspace(n.log(kmin),n.log(kmax),N))
     Y = ig_SX(RL,R0,K)
     return n.trapz(Y,K)
 
@@ -135,7 +138,8 @@ def F(x):
 	return (x**3-3*x)/2*(erf(x*n.sqrt(5./2))+erf(x*n.sqrt(5./8)))+n.sqrt(2./5/n.pi)*((31.*x**2/4+8./5)*n.exp(-5.*x**2/8)+(x**2/2-8./5)*n.exp(-5.*x**2/2))
 def Deltac(z):
 	fgrowth = pb.fgrowth(z, cosmo['omega_M_0'])    # = D(z)/D(0)
-	return 1.686/fgrowth
+	#return 1.686/fgrowth
+	return 1.686*fgrowth                                                   #?????
 def pG(y,av,var):
 	return 1/n.sqrt(2*n.pi*var)*n.exp(-(y-av)**2/2/var)
 def B(z,beta,s):
@@ -166,8 +170,8 @@ def subgrand_trapz_log(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=Fa
 	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b
-	lxmin,lxmax = n.log(b*gamm), n.log(80.)
-	lx = n.linspace(lxmin,lxmax,100)
+	lxmin,lxmax = n.log(b*gamm), n.log(100.)
+	lx = n.linspace(lxmin,lxmax,1000)
 	x = n.exp(lx)
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)*x
 	factint = trapz(x,y)
@@ -184,7 +188,7 @@ def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False)
 	fact = V/Vstar(R0)*pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b
-	x = n.linspace(b*gamm,100.,100)                          #TUNE
+	x = n.linspace(b*gamm,100.,1000)                          #TUNE
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)
 	factint = trapz(x,y)
 	#print y
@@ -208,7 +212,7 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 
 #!! varx can be negative
 
-	b = n.arange(0.00001,3.,0.03)
+	b = n.arange(0.00001,3.,0.003)
 	y = []
 	for bx in b:
 		newy = prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s
@@ -243,7 +247,7 @@ def fcoll_trapz_log(del0,M0,z,debug=False):
 	print del0
 	mm = mmin(z)
 	R0 = m2R(M0)
-	lmx = n.linspace(n.log(mm),n.log(M0),100)
+	lmx = n.linspace(n.log(mm),n.log(M0),1000)
 	y = []
 	for lm in lmx:
 		m = n.exp(lm)
@@ -275,7 +279,7 @@ def parafunc(S0,Z):
 	M0 = S2M(S0)
 	def newfunc(del0):
 		return fcoll_trapz_log(del0,M0,Z)*40-1
-	return brentq(newfunc,11,15,xtol=5.E-2,maxiter=10)
+	return brentq(newfunc,11,14.5,xtol=1.E-3,maxiter=100)
 
 #
 
