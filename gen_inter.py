@@ -57,7 +57,7 @@ def ig_SX(RL,R0,k):
     return Del2k(k)*W(RL*k)*W(R0*k)/k
 def sig0_trapz(RL,kf=50.,N=2000):
     kmax = kf/RL
-    K = n.exp(n.linspace(n.log(0.0001),n.log(kmax),N))
+    K = n.exp(n.linspace(n.log(0.001),n.log(kmax),N))
     Y = ig_sig0(RL,K)
     return n.trapz(Y,K) 
 def sigG_trapz(RL,j,kf=100.,N=2000,kmin=0.01):

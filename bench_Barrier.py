@@ -9,6 +9,7 @@ import optparse, sys
 from scipy.optimize import brenth, brentq
 from joblib import Parallel, delayed
 import multiprocessing
+import profile
 num_cores = multiprocessing.cpu_count()
 
 o = optparse.OptionParser()
@@ -207,7 +208,11 @@ def trapz(x,y):
 # 	#factint = quad(lambda x: (x/gamm-b)*F(x)*pG(x,meanx,varx),b*gamm,100)[0]
 # 	#print fact, factint
 # 	return fact*factint
-
+bgam = []
+mx = []
+vx = []
+yfin = []
+ysamp = []
 def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False):
 	# EqA8, non-log intervaled integration axis
 	Bb = B(z,b,s)
@@ -217,8 +222,10 @@ def subgrand_trapz(b,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z,err=False)
 	#print b, Bb/n.sqrt(s),meanmu,varmu,pG(Bb/n.sqrt(s),meanmu, varmu)
 	#print b
 	#x = n.linspace(b*gamm,100.,200)                          #TUNE
-	x = n.exp(n.linspace(n.log(b*gamm),n.log(100),200))
+	x = n.exp(n.linspace(n.log(b*gamm),n.log(150),200))
 	y = (x/gamm-b)*F(x)*pG(x,meanx,varx)
+	bgam.append(b*gamm); mx.append(meanx); vx.append(varx); yfin.append(y[-1])
+	#import IPython; IPython.embed()
 	factint = trapz(x,y)
 	#print y
 	#print factint
@@ -242,7 +249,7 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 #!! varx can be negative
 
 	#b = n.arange(0.00001,30.,0.03)                      #TUNE
-	b = n.exp(n.linspace(n.log(0.05),n.log(20.),200))
+	b = n.exp(n.linspace(n.log(0.01),n.log(30.),1000))  #Wide range from E-21 to E-280, peaking at E-7
 	y = []
 	for bx in b:
 		newy = prob(bx)*subgrand_trapz(bx,del0,s,s0,sx,epx,q,meanmu,varmu,varx,gamm,R0,V,z)/2/s
@@ -255,8 +262,6 @@ def integrand_trapz(del0,m,M0,R0,z):  #2s*f_ESP
 		else:
 			y.append(newy)
 	#import IPython; IPython.embed()
-	if y[-1]/n.max(y)>1.E-3: print "Warning: choice of bmax too small"
-	if y[0]/n.max(y)>1.E-3: print "Warning: choice of bmin too big"
 	return n.trapz(y,b)
 	#return quad(lambda b: prob(b)*subgrand_trapz(b,del0,m,M0,z),0,4.)[0]/2/s
 def dsdm(m):
@@ -280,7 +285,7 @@ def fcoll_trapz_log(del0,M0,z,debug=False):
 	print del0
 	mm = mmin(z)
 	R0 = m2R(M0)
-	lmx = n.linspace(n.log(mm),n.log(M0),200)
+	lmx = n.linspace(n.log(mm),n.log(M0),100)
 	y = []
 	for lm in lmx:
 		m = n.exp(lm)
@@ -303,7 +308,6 @@ Z = 12.
 #Mlist = n.exp(n.linspace(n.log(M0),n.log(1000*M0),10))
 Slist = n.arange(7.,15.,1.)
 Mlist = S2M(Slist)
-rootlist = []
 #dlist = n.linspace(8,10,16)
 # for del0 in dlist:
 # 	res = fcoll_trapz_log(del0,M0,Z)
@@ -318,10 +322,6 @@ rootlist = []
 	
 
 #
-def resinterp(x1,x2,y1,y2):
-	if y1*y2>0: raise ValueError('resinterp: root not in range')
-	else:
-		return (y2*x1-y1*x2)/(y2-y1)
 
 if False:
 	reslist = Parallel(n_jobs=num_cores)(delayed(parafunc)(S0,Z) for S0 in Slist)
@@ -330,34 +330,14 @@ if False:
 	p.plot(Slist,reslist)
 	p.show()
 elif True:
-	for M0 in Mlist:
-		def newfunc(del0):
-			return fcoll_trapz_log(del0,M0,Z)*40-1
-		Dlist = n.linspace(3.,17.,8)
-		reslist = Parallel(n_jobs=num_cores)(delayed(newfunc)(d0) for d0 in Dlist)
-		print reslist
-
-		if reslist[0]*reslist[-1]>0: 
-			print "root not in range"
-		else:
-			print "enter second round of process"
-			i = 0
-			while reslist[i]*reslist[-1]<0: i+=1
-			Dlist2 = n.linspace(Dlist[i-1],Dlist[i],8)
-			reslist = Parallel(n_jobs=num_cores)(delayed(newfunc)(d0) for d0 in Dlist2)
-			print reslist
-			i = 0
-			while reslist[i]*reslist[-1]<0: i+=1
-			resroot = resinterp(Dlist2[i-1],Dlist2[i],reslist[i-1],reslist[i])
-			print 'Barrier height:', resroot
-			rootlist.append(resroot)
-	print rootlist
-
-	p.figure()
-	p.plot(Slist,rootlist)
-	p.show()
-
-	
+	M0 = S2M(10.)
+	def newfunc(del0):
+		return fcoll_trapz_log(del0,M0,Z)*40-1
+	#Dlist = n.linspace(9.,17.,8)
+	profile.run('print newfunc(9.2); print')
+	#reslist = Parallel(n_jobs=num_cores)(delayed(newfunc)(d0) for d0 in Dlist)
+	#print reslist
+	n.savez('diagnostic.npz',bgam,mx,vx,yfin,ysamp)
 else:
 	print 'doing nothing'
 	#tplquad(All,mmin,M0,lambda x: 0, lambda x: 5., lambda x,y: gam(m2R(x))*y,lambda x,y: 10.,args=(del0,M0,z))
